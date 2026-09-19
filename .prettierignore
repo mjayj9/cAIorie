@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.wrangler/
+outputs/
+.sites-runtime/
+test-results/
+components/ui/
+docs/SOURCE_SPEC.md
