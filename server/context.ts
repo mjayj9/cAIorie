@@ -1,5 +1,6 @@
+import { requestOrigin } from "./request-origin.ts";
 import { rebuildLearning } from "./learning-service.ts";
-import { env } from "cloudflare:workers";
+import { getRuntime } from "#lunch-runtime";
 import { initialState } from "../domain/defaults.ts";
 import { localDate, shiftDay } from "../domain/meals.ts";
 import type { SessionState } from "../domain/models.ts";
@@ -17,13 +18,8 @@ export type Context = {
   request: Request;
 };
 export async function context(request: Request): Promise<Context> {
-  if (!env.DB)
-    throw new AppError(
-      503,
-      "DATABASE_REQUIRED",
-      "로컬 데이터베이스 준비가 필요해요. README의 db:setup을 실행해 주세요.",
-    );
-  const bindings = env as unknown as Record<string, string | undefined>;
+  const { database, bindings } = getRuntime();
+  const externalOrigin = requestOrigin(request, bindings.VERCEL === "1");
   const config: ProviderConfig = {
     demoMode: bindings.DEMO_MODE !== "false",
     kakaoKey: bindings.KAKAO_REST_API_KEY ?? "",
@@ -34,9 +30,12 @@ export async function context(request: Request): Promise<Context> {
     aiModel: bindings.AI_MODEL ?? "",
     aiBaseUrl: bindings.AI_BASE_URL ?? "",
     nutritionKey: bindings.NUTRITION_API_KEY ?? "",
-    registryKey: bindings.PUBLIC_DATA_API_KEY ?? "",
+    registryKey:
+      bindings.RESTAURANT_REGISTRY_API_KEY ??
+      bindings.PUBLIC_DATA_API_KEY ??
+      "",
   };
-  const repo = new Repository(env.DB),
+  const repo = new Repository(database),
     cookieValue = request.headers
       .get("cookie")
       ?.match(/(?:^|;\s*)lunch_session=([^;]+)/)?.[1];
@@ -68,7 +67,7 @@ export async function context(request: Request): Promise<Context> {
       "lunch_session=" +
       raw +
       "; HttpOnly; SameSite=Strict; Path=/; Max-Age=2592000" +
-      (new URL(request.url).protocol === "https:" ? "; Secure" : "");
+      (externalOrigin.startsWith("https:") ? "; Secure" : "");
   }
   const state = JSON.parse(row.state) as SessionState;
   if (state.consents.saveSensitive && config.encryptionKey.length >= 32) {
@@ -92,7 +91,7 @@ export async function context(request: Request): Promise<Context> {
   }
   if (!["GET", "HEAD"].includes(request.method)) {
     const origin = request.headers.get("origin"),
-      expected = new URL(request.url).origin;
+      expected = externalOrigin;
     if (origin !== expected || request.headers.get("x-csrf-token") !== row.csrf)
       throw new AppError(403, "CSRF", "새로고침 후 다시 시도해 주세요.");
   }
@@ -108,7 +107,7 @@ export async function context(request: Request): Promise<Context> {
       "lunch_session=" +
       cookieValue +
       "; HttpOnly; SameSite=Strict; Path=/; Max-Age=2592000" +
-      (new URL(request.url).protocol === "https:" ? "; Secure" : "");
+      (externalOrigin.startsWith("https:") ? "; Secure" : "");
   }
   const removed = await repo.cleanup(
     owner,

@@ -1,3 +1,4 @@
+import { ProviderError } from "../../providers/http.ts";
 import { rebuildLearning } from "../learning-service.ts";
 import { z } from "zod";
 import {
@@ -143,7 +144,11 @@ export async function parse(
     return fallback;
   try {
     return await parseWithOpenRouter(c.config, text, c.request.signal);
-  } catch {
+  } catch (error) {
+    console.warn(
+      "Meal AI fallback:",
+      error instanceof ProviderError ? error.code : "unavailable",
+    );
     return {
       ...fallback,
       notice:

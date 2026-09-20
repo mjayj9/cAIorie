@@ -1,0 +1,17 @@
+node_modules
+.next
+dist
+.wrangler
+.sites-runtime
+.agents
+.codex
+.openai/*
+!.openai/hosting.json
+outputs
+work
+.npm-cache
+test-results
+docs/screenshots
+.env*
+!.env.example
+*.tsbuildinfo

@@ -49,3 +49,5 @@ next-env.d.ts
 !/.env.example
 /test-results/
 *.tsbuildinfo
+.vercel
+.env*

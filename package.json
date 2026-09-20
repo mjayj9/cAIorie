@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=24.0.0"
+    "node": "24.x"
   },
   "scripts": {
     "install:ci": "node scripts/install-ci.mjs",
@@ -17,11 +17,16 @@
     "db:setup": "node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 migrations apply DB --local --config wrangler.local.json --persist-to .wrangler/state",
     "test:e2e": "playwright test",
     "format": "prettier --write app domain features fixtures providers server db tests prompts docs *.md",
-    "check:apis": "node scripts/check-api-keys.mjs"
+    "check:apis": "node scripts/check-api-keys.mjs",
+    "build:vercel": "next build",
+    "dev:vercel": "next dev --port 5175",
+    "start:vercel": "next start --port 5175",
+    "db:migrate:vercel": "node scripts/migrate-postgres.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
     "@hookform/resolvers": "^5.7.1",
+    "@neondatabase/serverless": "^1.1.0",
     "@shadcn/react": "^0.3.0",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
@@ -73,5 +78,8 @@
     "miniflare": {
       "sharp": "0.35.4"
     }
+  },
+  "imports": {
+    "#lunch-runtime": "./server/runtime.ts"
   }
 }

@@ -1,16 +1,16 @@
 # 한끼로그 — SDGs 점심 추천
 
-한국어 반응형 점심 추천·식사 기록 웹 앱입니다. 실제 식당 조회와 식사 기록을 서버 API·D1 데이터베이스로 처리하며, 키 없이 사용하는 시연 모드도 제공합니다.
+한국어 반응형 점심 추천·식사 기록 웹 앱입니다. 실제 식당 조회와 식사 기록을 서버 API·Neon 데이터베이스로 처리하며, 키 없이 사용하는 시연 모드도 제공합니다.
 
 - **앱 열기:** [GitHub Pages](https://mjayj9.github.io/cAIorie/)
-- **공개 앱 주소:** [한끼로그](https://mjayj9-caiorie.michaeljung1214.chatgpt.site)
+- **공개 앱 주소:** [한끼로그](https://caiorie.vercel.app)
 - **소스 코드:** [mjayj9/cAIorie](https://github.com/mjayj9/cAIorie)
 
-GitHub Pages는 공개 앱으로 이동하는 진입 페이지입니다. 앱과 데이터베이스는 Sites에서 실행됩니다. 초기 공개 설정은 시연 모드이며, 실제 식당·공공데이터·AI 연결은 서버의 비밀 환경변수 설정 후 켭니다. [배포 구조와 설정](docs/DEPLOYMENT.md)을 참고하세요.
+GitHub Pages는 Vercel 공개 앱으로 이동하는 진입 페이지입니다. 실제 식당·공공데이터·AI 키는 Vercel의 서버 전용 비밀 환경변수에 연결하며, 식사 기록은 Neon Free Postgres에 저장합니다. [배포 구조와 설정](docs/DEPLOYMENT.md)을 참고하세요.
 
 ## 실행
 
-Node.js **24 이상**과 npm이 필요합니다.
+Node.js **24.x**과 npm이 필요합니다.
 
 ```powershell
 npm ci
@@ -19,7 +19,7 @@ npm run db:setup
 npm run dev
 ```
 
-브라우저에서 **http://localhost:5173/** 를 엽니다. 이미 `.env`가 있다면 덮어쓰지 마세요. 로컬 SQLite는 `.wrangler/state` 아래에 생성됩니다.
+브라우저에서 **http://localhost:5173/** 를 엽니다. 이미 `.env`가 있다면 덮어쓰지 마세요. 로컬 SQLite는 `.wrangler/state` 아래에 생성됩니다. 이 기본 개발 명령은 D1을 사용합니다. Vercel용 Next.js 실행과 DB 설정은 [배포 문서](docs/DEPLOYMENT.md)를 참고하세요.
 
 Windows에서 PATH 또는 npm 중첩 실행 문제를 만난 경우:
 
@@ -86,7 +86,9 @@ npm run build
 - `providers/`: 외부 I/O·응답 검증·기능 계약
 - `server/`: 세션·동의·API·오케스트레이터·SQL 저장소
 - `features/lunch/`: 기능별 React 화면과 상태 연결
-- `db/`, `drizzle/`: 관계형 스키마·마이그레이션
+- `db/postgres/`: Vercel용 PostgreSQL 마이그레이션
+- `db/schema.ts`, `drizzle/`: 로컬 D1 스키마·마이그레이션
+- `server/database/`: 공통 SQL 계약과 Neon·D1 어댑터
 - `fixtures/`: 명확히 구분한 가상 데이터
 - `prompts/`: 원문의 앱 내부 런타임 프롬프트, 현재 외부 모델에 전송하지 않음
 - `tests/`: 도메인·HTTP 통합·실제 브라우저 검사

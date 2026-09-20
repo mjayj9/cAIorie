@@ -1,3 +1,4 @@
+import type { Database, SqlStatement } from "./database/contracts.ts";
 import { recommendationForCache } from "../providers/persistence.ts";
 import { archiveSelection } from "../domain/selections.ts";
 import type {
@@ -10,20 +11,20 @@ import type {
 import { initialState } from "../domain/defaults.ts";
 import { requireValue } from "./errors.ts";
 export class Repository {
-  constructor(public db: D1Database) {}
+  constructor(public db: Database) {}
   statement(sql: string, ...args: unknown[]) {
-    return this.db.prepare(sql).bind(...args);
+    return { sql, args };
   }
   async first<T>(sql: string, ...args: unknown[]) {
-    return this.statement(sql, ...args).first<T>();
+    return this.db.first<T>(this.statement(sql, ...args));
   }
   async rows<T>(sql: string, ...args: unknown[]) {
-    return (await this.statement(sql, ...args).all<T>()).results;
+    return this.db.rows<T>(this.statement(sql, ...args));
   }
   async run(sql: string, ...args: unknown[]) {
-    return this.statement(sql, ...args).run();
+    return this.db.run(this.statement(sql, ...args));
   }
-  async batch(statements: D1PreparedStatement[]) {
+  async batch(statements: SqlStatement[]) {
     return this.db.batch(statements);
   }
   async state(owner: string) {
@@ -78,7 +79,7 @@ export class Repository {
   }
   async insertMeal(owner: string, meal: Meal, key: string) {
     await this.run(
-      "INSERT OR IGNORE INTO meals (id, owner, day, payload, idempotency_key) VALUES (?, ?, ?, ?, ?)",
+      "INSERT INTO meals (id, owner, day, payload, idempotency_key) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
       meal.id,
       owner,
       meal.day,
@@ -141,11 +142,11 @@ export class Repository {
     saveVisits = false,
   ) {
     const payload = archiveSelection(selection, status, meal, saveVisits);
-    const statements: D1PreparedStatement[] = [];
+    const statements: SqlStatement[] = [];
     if (meal)
       statements.push(
         this.statement(
-          "INSERT OR IGNORE INTO meals (id, owner, day, payload, idempotency_key) SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM selections WHERE id = ? AND owner = ? AND status = 'awaiting_confirmation')",
+          "INSERT INTO meals (id, owner, day, payload, idempotency_key) SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM selections WHERE id = ? AND owner = ? AND status = 'awaiting_confirmation') ON CONFLICT DO NOTHING",
           meal.id,
           owner,
           meal.day,
@@ -199,6 +200,6 @@ export class Repository {
         cutoff,
       ),
     ]);
-    return result[result.length - 1]?.meta.changes ?? 0;
+    return result[result.length - 1]?.changes ?? 0;
   }
 }
