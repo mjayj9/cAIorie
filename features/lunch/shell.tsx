@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import Image from "next/image";
 import { UsageGuide } from "./usage-guide";
 import {
   BookOpen,
@@ -11,7 +12,6 @@ import {
   ShieldCheck,
   Sparkles,
   Users,
-  Utensils,
 } from "lucide-react";
 import {
   Sidebar,
@@ -82,16 +82,25 @@ function ShellContents({
       </a>
       <Sidebar className="app-sidebar">
         <SidebarHeader>
-          <Link href="/" className="brand" onClick={() => navigate("home")}>
-            <span className="brand-icon">
-              <Utensils size={23} />
+          <Link
+            href="/"
+            className="brand"
+            aria-label="cAlorie 홈"
+            onClick={() => navigate("home")}
+          >
+            <span className="brand-logo">
+              <Image
+                src="/images/calorie-logo.png"
+                alt="cAlorie"
+                width={549}
+                height={308}
+                sizes="280px"
+              />
             </span>
-            <span>
-              한끼로그<small>MY DAILY LUNCH</small>
-            </span>
+            <small>MY DAILY LUNCH</small>
           </Link>
         </SidebarHeader>
-        <SidebarContent>
+        <SidebarContent className="app-sidebar-content">
           <p className="nav-label">나를 위한 한 끼</p>
           <SidebarMenu>
             {navigation.map(({ key, title, icon: Icon }) => (
@@ -122,7 +131,7 @@ function ShellContents({
             <span>SDG 3 · 건강과 웰빙</span>
           </div>
         </SidebarContent>
-        <SidebarFooter>
+        <SidebarFooter className="app-sidebar-footer">
           <button onClick={() => navigate("privacy")}>
             <ShieldCheck size={18} />
             개인정보 관리
@@ -144,7 +153,14 @@ function ShellContents({
         <header className="topbar">
           <div className="flex items-center gap-3">
             <SidebarTrigger className="mobile-trigger" aria-label="메뉴 열기" />
-            <span>나의 점심, 나의 기준</span>
+            <span className="topbar-tagline">나의 점심, 나의 기준</span>
+            <Link
+              href="/"
+              className="mobile-brand"
+              onClick={() => navigate("home")}
+            >
+              cAlorie
+            </Link>
           </div>
           <div className="flex items-center gap-3">
             <UsageGuide />

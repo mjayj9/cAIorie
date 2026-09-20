@@ -121,7 +121,7 @@ export const demoEvidence: Evidence[] = rows.map((r) => ({
   retrievedAt: "2026-09-19T00:00:00Z",
   appliesToPlaceId: r.id,
   appliesToMenuId: null,
-  attribution: "한끼로그 가상 시연 자료",
+  attribution: "cAlorie 가상 시연 자료",
   storageAllowed: true,
 }));
 export const demoPlaces: Place[] = rows.map((r, index) => {

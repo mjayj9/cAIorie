@@ -6,7 +6,7 @@ test("first-use guide is accessible, dismissible, persistent and can be reopened
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
-  const guide = page.getByRole("dialog", { name: "한끼로그, 이렇게 사용해요" });
+  const guide = page.getByRole("dialog", { name: "cAlorie, 이렇게 사용해요" });
   await expect(guide).toBeVisible();
   await expect(guide).toContainText("위치와 거리 범위부터 정해요");
   for (const title of [

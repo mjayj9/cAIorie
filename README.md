@@ -1,9 +1,9 @@
-# 한끼로그 — SDGs 점심 추천
+# cAlorie — SDGs 점심 추천
 
 한국어 반응형 점심 추천·식사 기록 웹 앱입니다. 실제 식당 조회와 식사 기록을 서버 API·Neon 데이터베이스로 처리하며, 키 없이 식당 추천을 둘러보는 시연 모드도 제공합니다. 식사 기록은 모드에 관계없이 식약처 DB 연결이 필요합니다.
 
 - **앱 열기:** [GitHub Pages](https://mjayj9.github.io/cAIorie/)
-- **공개 앱 주소:** [한끼로그](https://caiorie.vercel.app)
+- **공개 앱 주소:** [cAlorie](https://caiorie.vercel.app)
 - **소스 코드:** [mjayj9/cAIorie](https://github.com/mjayj9/cAIorie)
 
 GitHub Pages는 Vercel 공개 앱으로 이동하는 진입 페이지입니다. 실제 식당·공공데이터·AI 키는 Vercel의 서버 전용 비밀 환경변수에 연결하며, 식사 기록은 Neon Free Postgres에 저장합니다. [배포 구조와 설정](docs/DEPLOYMENT.md)을 참고하세요.

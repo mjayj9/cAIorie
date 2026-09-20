@@ -86,7 +86,7 @@ export function UsageGuide() {
       >
         <DialogContent className="flow-dialog usage-guide">
           <DialogHeader>
-            <DialogTitle>한끼로그, 이렇게 사용해요</DialogTitle>
+            <DialogTitle>cAlorie, 이렇게 사용해요</DialogTitle>
             <DialogDescription>
               추천부터 식사 일지까지, 네 단계로 시작해 보세요.
             </DialogDescription>

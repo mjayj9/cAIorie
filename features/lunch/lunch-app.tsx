@@ -588,7 +588,7 @@ export function LunchApp() {
                 url = URL.createObjectURL(blob),
                 a = document.createElement("a");
               a.href = url;
-              a.download = "hankki-data-" + localDate(new Date()) + ".json";
+              a.download = "calorie-data-" + localDate(new Date()) + ".json";
               a.click();
               URL.revokeObjectURL(url);
               toast.success("내보내기 파일을 만들었어요.");
