@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Restored Turbopack build artifacts served outdated CSS on Vercel.
+  // Rebuild production assets while retaining normal development caching.
+  experimental: { turbopackFileSystemCacheForBuild: false },
 };
 
 export default nextConfig;
