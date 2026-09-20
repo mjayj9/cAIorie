@@ -54,6 +54,7 @@ export type Consents = {
 };
 export type Conditions = {
   budget: number | null;
+  minDistance: number;
   maxDistance: number | null;
   availableMinutes: number | null;
   returnTrip: boolean;

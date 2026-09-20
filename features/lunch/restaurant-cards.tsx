@@ -1,16 +1,10 @@
 "use client";
-import {
-  ArrowUpRight,
-  Check,
-  MapPin,
-  Phone,
-  ShieldAlert,
-  Utensils,
-} from "lucide-react";
+import { Check, MapPin, ShieldAlert, Utensils } from "lucide-react";
 import type { Place, PlaceCandidate } from "@/domain/models";
 import type { RegistryLookup } from "@/domain/foods";
 import { formatDistance } from "@/domain/distance";
 import { NearbyPlaceRow } from "./registry";
+import { RestaurantLinks } from "./restaurant-links";
 export function RestaurantCards({
   candidates,
   simple,
@@ -74,37 +68,7 @@ export function RestaurantCards({
             {c.checks.join(" · ")}
           </p>
           <div className="restaurant-actions">
-            {c.place.url && (
-              <a
-                className="outline-button"
-                href={c.place.url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                메뉴·가격 보기
-                <ArrowUpRight size={14} />
-              </a>
-            )}
-            {c.place.directionsUrl && (
-              <a
-                className="outline-button"
-                href={c.place.directionsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                길찾기
-                <ArrowUpRight size={14} />
-              </a>
-            )}
-            {c.place.phone && /^[+0-9() -]+$/.test(c.place.phone) && (
-              <a
-                className="text-button"
-                href={"tel:" + c.place.phone.replace(/[^+0-9]/g, "")}
-              >
-                <Phone size={14} />
-                전화
-              </a>
-            )}
+            <RestaurantLinks place={c.place} />
             {!c.inquiryOnly && (
               <button
                 className="primary-button"
@@ -150,16 +114,7 @@ export function ChosenRestaurant({
         <small>선택한 식당은 이 화면에서만 유지돼요.</small>
       </div>
       <div className="button-row">
-        {place.directionsUrl && (
-          <a
-            className="outline-button"
-            href={place.directionsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            길찾기 ↗
-          </a>
-        )}
+        <RestaurantLinks place={place} />
         <button className="primary-button" onClick={onRecord}>
           먹은 음식 기록
         </button>

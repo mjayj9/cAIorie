@@ -145,6 +145,7 @@ export async function recommend(
               input.conditions.maxDistance,
               signal,
               input.conditions.craving,
+              input.conditions.minDistance ?? 0,
             )
           : await searchGoogle(
               config,
@@ -169,6 +170,7 @@ export async function recommend(
           ...p,
           conditions: {
             ...p.conditions,
+            minDistance: conditions.minDistance ?? 0,
             maxDistance: conditions.maxDistance,
             availableMinutes: conditions.availableMinutes,
             returnTrip: conditions.returnTrip,
@@ -186,6 +188,7 @@ export async function recommend(
             ...p,
             conditions: {
               ...p.conditions,
+              minDistance: conditions.minDistance ?? 0,
               maxDistance: conditions.maxDistance,
               availableMinutes: conditions.availableMinutes,
               returnTrip: conditions.returnTrip,
@@ -267,6 +270,7 @@ export async function recommend(
                 radius,
                 signal,
                 input.conditions.craving,
+                input.conditions.minDistance ?? 0,
               )
             : await searchGoogle(config, input.location, radius, signal);
         const candidates = rankPlaces(

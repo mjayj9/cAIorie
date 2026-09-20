@@ -31,7 +31,10 @@ export function ConditionsForm({
       />
       <DistanceInput
         value={value.maxDistance}
-        onChange={(v) => set("maxDistance", v)}
+        minimum={value.minDistance ?? 0}
+        onChange={(maxDistance, minDistance) =>
+          onChange({ ...value, maxDistance, minDistance })
+        }
       />
       <NumberField
         label="식사 가능 시간"
@@ -109,8 +112,8 @@ export function ConditionsDialog({
         <DialogHeader>
           <DialogTitle>오늘만 조건 변경</DialogTitle>
           <DialogDescription>
-            비워 둔 항목은 제한하지 않아요. 이동 반경은 직선거리 기준이며 실제
-            경로와 달라요.
+            비워 둔 항목은 제한하지 않아요. 이동 거리 범위는 직선거리 기준이며
+            실제 경로와 달라요.
           </DialogDescription>
         </DialogHeader>
         <ConditionsForm value={draft} onChange={setDraft} />
@@ -130,7 +133,8 @@ export function ConditionsDialog({
             const checked = conditionsSchema.safeParse(draft);
             if (!checked.success) {
               setError(
-                "입력 범위를 확인해 주세요. 반경은 0보다 크고 50km 이하, 시간은 1~600분, 인원은 1~20명이에요.",
+                checked.error.issues[0]?.message ??
+                  "입력 범위를 확인해 주세요.",
               );
               return;
             }

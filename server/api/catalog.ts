@@ -1,19 +1,10 @@
 import { z } from "zod";
 import type { Context } from "../context.ts";
-import type { CatalogFood } from "../../domain/foods.ts";
-import { demoFoodCatalog } from "../../fixtures/demo.ts";
 import { searchNutrition } from "../../providers/nutrition.ts";
 import { lookupRegistry } from "../../providers/registry.ts";
 import { ProviderError } from "../../providers/http.ts";
 import { AppError } from "../errors.ts";
 
-export const demoCatalog: CatalogFood[] = demoFoodCatalog.map((food) => ({
-  ...food,
-  basisGrams: null,
-  category: null,
-  sourceUrl: null,
-  updatedAt: null,
-}));
 export function requireMealAccess(c: Context) {
   if (
     !c.state.onboarded ||
@@ -34,12 +25,6 @@ export async function searchFoods(c: Context, query: string) {
     .min(1, "음식 이름을 입력해 주세요.")
     .max(100)
     .parse(query);
-  if (c.config.demoMode)
-    return {
-      mode: "demo",
-      items: demoCatalog.filter((food) => food.name.includes(q)),
-      notice: "데모 음식 카탈로그입니다. 실제 영양값을 제공하지 않습니다.",
-    };
   try {
     return {
       mode: "live",
@@ -52,8 +37,8 @@ export async function searchFoods(c: Context, query: string) {
       503,
       "NUTRITION_UNAVAILABLE",
       error instanceof ProviderError && error.code === "unconfigured"
-        ? "식약처 API 키 설정을 확인해 주세요. 직접 입력으로 기록할 수 있어요."
-        : "공식 영양 DB를 불러오지 못했어요. 잠시 후 다시 검색하거나 직접 입력해 주세요.",
+        ? "식약처 DB 연결이 준비되지 않았어요. 연결이 복구된 뒤 검색해 주세요."
+        : "식약처 DB를 불러오지 못했어요. 잠시 후 다시 검색해 주세요. 확인되지 않은 음식은 저장할 수 없어요.",
     );
   }
 }

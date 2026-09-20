@@ -25,7 +25,7 @@ Vercel은 PUBLIC\_ 접두사를 공개 변수로 분류하므로 행정정보 �
 
 일반 설정은 APP_ENV=production, DEMO_MODE=false, AI_PROVIDER=openrouter, AI_BASE_URL=https://openrouter.ai/api/v1, AI_MODEL=openrouter/free입니다. DATABASE_URL은 Vercel의 Neon 연동으로 제공됩니다. Preview에는 Production DB와 키를 공유하지 않으며, 별도 DB를 연결하기 전에는 저장 기능을 검증할 수 없습니다.
 
-AI는 성인 사용자의 별도 전송 동의 후 미리보기를 요청할 때만 호출됩니다. 무료 공급자가 요청을 처리하지 못하거나 응답 검증에 실패하면 명시적인 안내와 함께 규칙 분석을 제공합니다. 서버 로그에는 실패 코드만 남기며 키와 식사 원문은 기록하지 않습니다.
+문장 분석 API는 성인의 별도 동의 후 요청할 때만 AI를 호출합니다. 음식 입력 UI는 식약처 DB 검색·선택만 제공하며 문장 분석 API 결과를 식사로 직접 저장하지 않습니다. 무료 공급자가 요청을 처리하지 못하거나 응답 검증에 실패하면 명시적인 안내와 함께 규칙 분석을 제공합니다. 서버 로그에는 실패 코드만 남기며 키와 식사 원문은 기록하지 않습니다.
 
 ## 배포와 마이그레이션
 

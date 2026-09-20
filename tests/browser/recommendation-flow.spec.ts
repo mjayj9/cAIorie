@@ -1,4 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
+import { skipGuide, pickOfficialFood } from "./helpers";
+test.beforeEach(async ({ page }) => skipGuide(page));
 async function onboard(page: Page) {
   await page
     .getByRole("checkbox", { name: "식사 기록 보관", exact: true })
@@ -25,7 +27,7 @@ async function conditions(page: Page) {
     .getByRole("spinbutton", { name: "1인 예산", exact: true })
     .fill("25000");
   await page
-    .getByRole("spinbutton", { name: "이동 반경", exact: true })
+    .getByRole("spinbutton", { name: "최대 이동 거리", exact: true })
     .fill("15");
   await expect(page.getByRole("dialog")).toContainText(
     "현재 15m는 매우 좁은 범위",
@@ -93,11 +95,11 @@ test("LIVE complete journey: explicit location, station search, food query, choi
     .getByRole("combobox", { name: "거리 단위", exact: true })
     .selectOption("km");
   await expect(
-    page.getByRole("spinbutton", { name: "이동 반경", exact: true }),
+    page.getByRole("spinbutton", { name: "최대 이동 거리", exact: true }),
   ).toHaveValue("0.015");
   await page.getByRole("button", { name: "1km", exact: true }).click();
   await expect(
-    page.getByRole("spinbutton", { name: "이동 반경", exact: true }),
+    page.getByRole("spinbutton", { name: "최대 이동 거리", exact: true }),
   ).toHaveValue("1");
   await page
     .getByRole("textbox", { name: "오늘 먹고 싶은 음식", exact: true })
@@ -145,6 +147,23 @@ test("LIVE complete journey: explicit location, station search, food query, choi
   await expect(
     first.getByRole("link", { name: "길찾기", exact: false }),
   ).toHaveAttribute("href", /map.kakao.com/);
+  const route = await first
+    .getByRole("link", { name: "길찾기", exact: false })
+    .getAttribute("href");
+  expect(route).toContain("/link/from/");
+  expect(route).toContain("/to/");
+  await first.getByRole("button", { name: "전화", exact: true }).click();
+  await expect(page.getByRole("dialog")).toContainText("전화 안내");
+  await expect(
+    page.getByRole("link", { name: "카카오맵에서 전화 확인", exact: false }),
+  ).toHaveAttribute("href", /place.map.kakao.com/);
+  const callLink = page.getByRole("link", {
+    name: "전화 앱 열기",
+    exact: true,
+  });
+  if (await callLink.count())
+    await expect(callLink).toHaveAttribute("href", /^tel:\+?\d+$/);
+  await page.keyboard.press("Escape");
   await expect(first).toContainText("1인 예산 이내의 메뉴");
   await expect(page.locator(".relaxation")).toHaveCount(0);
   await expect(page.locator("[data-sonner-toast]")).toHaveCount(0, {
@@ -178,11 +197,9 @@ test("LIVE complete journey: explicit location, station search, food query, choi
     .getByRole("button", { name: "먹은 음식 기록", exact: true })
     .click();
   await expect(
-    page.getByRole("textbox", { name: "먹은 음식", exact: true }),
-  ).toHaveValue("");
-  await page
-    .getByRole("textbox", { name: "먹은 음식", exact: true })
-    .fill("비빔밥 반 공기");
+    page.getByRole("button", { name: "먹은 식사로 기록", exact: true }),
+  ).toBeDisabled();
+  await pickOfficialFood(page);
   await page
     .getByRole("button", { name: "먹은 식사로 기록", exact: true })
     .click();
@@ -191,7 +208,7 @@ test("LIVE complete journey: explicit location, station search, food query, choi
   expect(saved).toHaveLength(1);
   expect(saved[0].dataMode).toBe("live");
   expect(saved[0].status).toBe("confirmed");
-  expect(saved[0].raw).toBe("비빔밥 반 공기");
+  expect(saved[0].items[0].foodId).toMatch(/^mfds:/);
   await page.reload();
   await expect(
     page.getByRole("button", { name: "이대로 추천받기", exact: true }),
@@ -204,10 +221,12 @@ test("LIVE complete journey: explicit location, station search, food query, choi
   await page
     .getByRole("button", { name: "오늘만 조건 변경", exact: true })
     .click();
-  expect(
-    await page
-      .locator(".distance-input-row input")
-      .evaluate((el) => el.getBoundingClientRect().width),
-  ).toBeGreaterThan(100);
+  const widths = await page
+    .locator(".distance-input-row input")
+    .evaluateAll((inputs) =>
+      inputs.map((el) => el.getBoundingClientRect().width),
+    );
+  expect(widths).toHaveLength(2);
+  expect(widths.every((width) => width > 75)).toBe(true);
   expect(errors).toEqual([]);
 });

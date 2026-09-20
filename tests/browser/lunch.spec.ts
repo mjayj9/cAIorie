@@ -1,4 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
+import { skipGuide, pickOfficialFood } from "./helpers";
+test.beforeEach(async ({ page }) => skipGuide(page));
 async function setup(page: Page) {
   await page.goto("/");
   await expect(
@@ -97,6 +99,10 @@ test("complete user journey: configure, recommend, map, select, confirm, rate, e
     (await (await page.request.get("/api/state")).json()).meals,
   ).toHaveLength(0);
   await page.getByRole("button", { name: "먹었어요", exact: true }).click();
+  await pickOfficialFood(page);
+  await page
+    .getByRole("button", { name: "선택한 음식으로 기록", exact: true })
+    .click();
   await page.getByRole("button", { name: "5점", exact: true }).click();
   await page.getByRole("button", { name: "평가 마치기", exact: true }).click();
   await expect(page.locator(".pending-meal")).toHaveCount(0);
@@ -106,10 +112,10 @@ test("complete user journey: configure, recommend, map, select, confirm, rate, e
   await expect(page.locator(".meal-row")).toHaveCount(1);
   await page.locator(".meal-row button").first().click();
   await page
-    .getByRole("textbox", { name: "먹은 음식", exact: true })
-    .fill("밥 반 공기, 계란 2개");
+    .getByRole("spinbutton", { name: "드신 중량 (g)", exact: true })
+    .fill("200");
   await page.getByRole("button", { name: "수정 저장", exact: true }).click();
-  await expect(page.locator(".meal-row")).toContainText("계란");
+  await expect(page.locator(".meal-row")).toContainText("200 g");
   await page.locator(".meal-row button").last().click();
   await page.getByRole("button", { name: "삭제하기", exact: true }).click();
   await expect(

@@ -196,3 +196,70 @@ test(
     }
   },
 );
+
+test(
+  "LIVE integrations: only official foods can be saved or edited and revisions persist",
+  { skip: !active, timeout: 60000 },
+  async () => {
+    const c = await client();
+    try {
+      const base = {
+        raw: "우라늄",
+        foodId: null,
+        source: "manual",
+        amount: null,
+        unit: null,
+        day: localDate(new Date()),
+        slot: "lunch",
+        timezone: "Asia/Seoul",
+        status: "confirmed",
+        idempotencyKey: crypto.randomUUID(),
+      };
+      for (const raw of ["우라늄", "마약"]) {
+        const response = await c.send("meals", { ...base, raw });
+        assert.equal(response.status, 400);
+        assert.equal(response.body.code, "OFFICIAL_FOOD_REQUIRED");
+      }
+      const search = await c.send<{ items: CatalogFood[] }>(
+        "foods?q=" + encodeURIComponent("쌀밥"),
+      );
+      const food = search.body.items.find((f) => f.name === "쌀밥")!;
+      assert.ok(food);
+      const official = {
+        ...base,
+        raw: food.name,
+        foodId: food.id,
+        source: "search",
+        amount: 100,
+        unit: "g",
+      };
+      const tampered = await c.send("meals", { ...official, raw: "우라늄" });
+      assert.equal(tampered.status, 400);
+      assert.equal(tampered.body.code, "FOOD_MISMATCH");
+      const saved = await c.send<{ meal: Meal }>("meals", official);
+      assert.equal(saved.status, 200);
+      const forgedEdit = await c.send("meals/edit", {
+        id: saved.body.meal.id,
+        draft: { ...base, raw: "마약" },
+      });
+      assert.equal(forgedEdit.status, 400);
+      const yesterday = new Date(Date.now() - 86400000).toLocaleDateString(
+        "en-CA",
+        { timeZone: "Asia/Seoul" },
+      );
+      const edited = await c.send("meals/edit", {
+        id: saved.body.meal.id,
+        draft: { ...official, day: yesterday, slot: "dinner", amount: 200 },
+      });
+      assert.equal(edited.status, 200);
+      const fresh = await c.send<{ meals: Meal[] }>("state");
+      assert.equal(fresh.body.meals.length, 1);
+      assert.equal(fresh.body.meals[0].raw, food.name);
+      assert.equal(fresh.body.meals[0].items[0].amount, 200);
+      assert.equal(fresh.body.meals[0].day, yesterday);
+      assert.equal(fresh.body.meals[0].slot, "dinner");
+    } finally {
+      await c.clean();
+    }
+  },
+);

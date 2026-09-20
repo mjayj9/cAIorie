@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { BookOpen, Plus, Pencil, Trash2, Search } from "lucide-react";
+import { BookOpen, Plus, Pencil, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -8,13 +8,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { HistoryAnalysis, Meal } from "@/domain/models";
 import { localDate } from "@/domain/meals";
 import { Choice, Field } from "./controls";
-import { getJson } from "./api";
+import { FoodPicker } from "./food-picker";
 import { nutritionForGrams, type CatalogFood } from "@/domain/foods";
-import type { MealParseResult } from "@/providers/ai";
 import { NutritionValues } from "./nutrition";
 const slots = {
   breakfast: "아침",
@@ -36,6 +34,8 @@ export function MealHistory({
   onEdit: (meal: Meal) => void;
   onDelete: (meal: Meal) => void;
 }) {
+  const [day, setDay] = useState("");
+  const visible = day ? meals.filter((meal) => meal.day === day) : meals;
   return (
     <>
       <div className="page-heading">
@@ -106,21 +106,48 @@ export function MealHistory({
         </section>
       </div>
       <div className="section-heading history-heading">
-        <h2>기록한 식사</h2>
+        <h2>날짜별 식사 일지</h2>
         <span className="caption">실제 식사와 계획을 구분해요</span>
       </div>
-      {!meals.length ? (
+      <div className="journal-filter">
+        <label>
+          기록 날짜{" "}
+          <input
+            aria-label="기록 날짜 필터"
+            type="date"
+            value={day}
+            onChange={(e) => setDay(e.target.value)}
+          />
+        </label>
+        <button
+          className="outline-button"
+          onClick={() => setDay(localDate(new Date()))}
+        >
+          오늘
+        </button>
+        <button className="text-button" onClick={() => setDay("")}>
+          전체 기록
+        </button>
+        <small>
+          각 기록의 ‘기록 수정’에서 음식·중량·날짜·식사 시점을 바꿀 수 있어요.
+        </small>
+      </div>
+      {!visible.length ? (
         <div className="empty-state panel">
           <BookOpen size={32} />
-          <h3>첫 한 끼를 남겨보세요</h3>
-          <p>음식 이름만 입력해도 괜찮아요. 양을 모르면 미상으로 남겨요.</p>
+          <h3>
+            {day ? day + "에 기록한 식사가 없어요" : "첫 한 끼를 남겨보세요"}
+          </h3>
+          <p>
+            식약처 DB에서 드신 음식을 선택하세요. 중량을 모르면 비워 두세요.
+          </p>
           <button className="primary-button" onClick={onNew}>
             첫 식사 기록
           </button>
         </div>
       ) : (
         <div className="meal-list">
-          {meals.map((m) => (
+          {visible.map((m) => (
             <article className="meal-row" key={m.id}>
               <span className="meal-slot">{slots[m.slot]}</span>
               <div className="meal-content">
@@ -170,11 +197,12 @@ export function MealHistory({
                   ))}
               </div>
               <button
-                className="icon-button"
-                aria-label={m.items[0]?.name + " 수정"}
+                className="outline-button journal-edit"
+                aria-label={m.items[0]?.name + " 기록 수정"}
                 onClick={() => onEdit(m)}
               >
                 <Pencil size={16} />
+                기록 수정
               </button>
               <button
                 className="icon-button"
@@ -233,7 +261,6 @@ export function MealEditor({
   busy,
   onClose,
   onSave,
-  onParse,
 }: {
   meal: Meal | null;
   initialDay?: string;
@@ -241,40 +268,45 @@ export function MealEditor({
   busy: boolean;
   onClose: () => void;
   onSave: (draft: MealDraft, id?: string) => Promise<void>;
-  onParse: (text: string) => Promise<MealParseResult>;
 }) {
-  const [draft, setDraft] = useState<MealDraft>({
-    raw: meal?.raw ?? "",
+  const existing =
+    meal?.items.length === 1 && meal.items[0].foodId?.startsWith("mfds:")
+      ? (meal.items[0].foodReference ?? null)
+      : null;
+  const [selectedFood, setSelectedFood] = useState<CatalogFood | null>(
+    existing,
+  );
+  const [draft, setDraft] = useState<MealDraft>(() => ({
+    raw: existing?.name ?? "",
     day: meal?.day ?? initialDay ?? localDate(new Date()),
     slot: meal?.slot ?? "lunch",
     timezone:
       meal?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
     status: meal?.status ?? "confirmed",
-    source: meal?.source ?? "manual",
-    foodId: meal?.items.length === 1 ? meal.items[0].foodId : null,
-    amount: meal?.items.length === 1 ? meal.items[0].amount : null,
-    unit: meal?.items.length === 1 ? meal.items[0].unit : null,
+    source: "search",
+    foodId: existing?.id ?? null,
+    amount: existing ? meal!.items[0].amount : null,
+    unit: existing ? meal!.items[0].unit : null,
     idempotencyKey: crypto.randomUUID(),
-  });
-  const [mode, setMode] = useState("manual"),
-    [query, setQuery] = useState(""),
-    [foods, setFoods] = useState<CatalogFood[]>([]),
-    [selectedFood, setSelectedFood] = useState<CatalogFood | null>(
-      meal?.items[0]?.foodReference ?? null,
-    ),
-    [searchNotice, setSearchNotice] = useState(
-      "음식 이름으로 검색하면 자료의 출처와 기준량을 표시해요.",
-    ),
-    [parsed, setParsed] = useState<MealParseResult | null>(null),
-    [pending, setPending] = useState(false),
-    [error, setError] = useState("");
-  const set = <K extends keyof MealDraft>(k: K, v: MealDraft[K]) =>
-    setDraft({ ...draft, [k]: v });
+  }));
+  const set = <K extends keyof MealDraft>(key: K, value: MealDraft[K]) =>
+    setDraft((previous) => ({ ...previous, [key]: value }));
+  const selectFood = (food: CatalogFood | null) => {
+    setSelectedFood(food);
+    setDraft((previous) => ({
+      ...previous,
+      raw: food?.name ?? "",
+      foodId: food?.id ?? null,
+      source: "search",
+      amount: null,
+      unit: null,
+    }));
+  };
   return (
     <Dialog
       open
-      onOpenChange={(o) => {
-        if (!o) onClose();
+      onOpenChange={(open) => {
+        if (!open && !busy) onClose();
       }}
     >
       <DialogContent className="flow-dialog wide-dialog">
@@ -283,126 +315,34 @@ export function MealEditor({
             {meal ? "식사 기록 수정" : "한 끼 기록하기"}
           </DialogTitle>
           <DialogDescription>
-            음식명과 드신 양을 적어주세요. 사진 분석은 지원하지 않아요.
+            식약처 DB에서 음식 선택 → 드신 중량 입력 → 날짜 확인 → 저장 순서로
+            기록해요.
           </DialogDescription>
         </DialogHeader>
         {placeName && (
           <p className="notice-box">
             선택한 식당: {placeName}
             <br />
-            실제로 드신 음식을 입력해 주세요. 식당을 선택한 것만으로 식사가
-            기록되지는 않아요.
+            실제로 드신 음식을 검색해 주세요.
           </p>
         )}
-        <Tabs value={mode} onValueChange={setMode}>
-          <TabsList>
-            <TabsTrigger value="manual">직접 입력</TabsTrigger>
-            <TabsTrigger value="search">메뉴 검색</TabsTrigger>
-          </TabsList>
-        </Tabs>
-        {mode === "search" && (
-          <>
-            <Field label="음식 검색">
-              <div className="button-row">
-                <input
-                  aria-label="음식 검색"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-                <button
-                  className="outline-button"
-                  disabled={pending || !query.trim()}
-                  onClick={async () => {
-                    setPending(true);
-                    try {
-                      const d = await getJson<{
-                        items: typeof foods;
-                        notice: string;
-                      }>("foods?q=" + encodeURIComponent(query));
-                      setFoods(d.items);
-                      setSearchNotice(d.notice);
-                      setError(
-                        d.items.length
-                          ? ""
-                          : "검색 결과가 없어요. 직접 입력으로 기록할 수 있어요.",
-                      );
-                    } catch (e) {
-                      setError((e as Error).message);
-                    } finally {
-                      setPending(false);
-                    }
-                  }}
-                >
-                  <Search size={16} />
-                  검색
-                </button>
-              </div>
-            </Field>
-            <p className="caption">{searchNotice}</p>
-            <div className="food-search-results">
-              {foods.map((f) => (
-                <button
-                  className="search-item"
-                  key={f.id}
-                  aria-pressed={draft.foodId === f.id}
-                  onClick={() => {
-                    setDraft({
-                      ...draft,
-                      raw: f.name,
-                      source: "search",
-                      foodId: f.id,
-                      amount: null,
-                      unit: null,
-                    });
-                    setParsed(null);
-                    setSelectedFood(f);
-                    setFoods([]);
-                  }}
-                >
-                  <span>
-                    {f.name}
-                    <small>
-                      {f.provider} · DB 기준 {f.basis}
-                    </small>
-                  </span>
-                </button>
-              ))}
-            </div>
-          </>
+        {meal && !existing && (
+          <p className="notice-box">
+            이전 기록: {meal.raw}
+            <br />이 기록을 수정하려면 식약처 DB에서 해당 음식을 선택해 주세요.
+          </p>
         )}
-        <Field
-          label="먹은 음식"
-          hint="예: 계란 2개, 밥 반 공기, 김치 조금. 쉼표로 구분하면 더 잘 나눌 수 있어요."
-        >
-          <textarea
-            aria-label="먹은 음식"
-            rows={3}
-            maxLength={2000}
-            value={draft.raw}
-            onChange={(e) => {
-              setDraft({
-                ...draft,
-                raw: e.target.value,
-                source: "manual",
-                foodId: null,
-                amount: null,
-                unit: null,
-              });
-              setParsed(null);
-              setSelectedFood(null);
-            }}
-            placeholder="무엇을 드셨나요?"
-          />
-        </Field>
+        <FoodPicker
+          selected={selectedFood}
+          onSelect={selectFood}
+          initialQuery={meal?.raw ?? ""}
+          disabled={busy}
+        />
         {selectedFood && (
           <section className="food-reference">
             <strong>
               {selectedFood.name} · DB 기준 {selectedFood.basis}
             </strong>
-            <NutritionValues nutrition={selectedFood.nutrition} />
-            <p className="caption">
-              위 수치는 DB 기준량의 값이며, 실제로 드신 양이 아니에요.
-            </p>
             <Field
               label="드신 중량 (g)"
               hint="중량을 모르면 비워 두세요. 공기·인분을 임의로 환산하지 않아요."
@@ -415,12 +355,13 @@ export function MealEditor({
                 step="any"
                 value={draft.amount ?? ""}
                 placeholder="미상"
+                disabled={busy}
                 onChange={(e) =>
-                  setDraft({
-                    ...draft,
+                  setDraft((previous) => ({
+                    ...previous,
                     amount: e.target.value ? Number(e.target.value) : null,
                     unit: e.target.value ? "g" : null,
-                  })
+                  }))
                 }
               />
             </Field>
@@ -428,14 +369,17 @@ export function MealEditor({
             <NutritionValues
               nutrition={nutritionForGrams(selectedFood, draft.amount)}
             />
+            <p className="caption">
+              식약처 DB 기준값이며, 실제 식당 메뉴의 재료·조리법·분량과 다를 수
+              있어요.
+            </p>
             {selectedFood.sourceUrl && (
               <a
                 href={selectedFood.sourceUrl}
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                {selectedFood.provider} ·{" "}
-                {selectedFood.updatedAt ?? "갱신일 미확인"} ↗
+                식약처 기준 자료 보기 ↗
               </a>
             )}
           </section>
@@ -467,6 +411,9 @@ export function MealEditor({
               { value: "planned", label: "아직 먹지 않은 계획이에요" },
             ]}
           />
+        </div>
+        <details>
+          <summary>시간대 설정</summary>
           <Field label="현지 시간대">
             <input
               aria-label="현지 시간대"
@@ -474,75 +421,31 @@ export function MealEditor({
               onChange={(e) => set("timezone", e.target.value)}
             />
           </Field>
-        </div>
-        {parsed && (
-          <div className="parse-preview">
-            <strong>입력에서 구분한 음식</strong>
-            <p className="caption">{parsed.notice}</p>
-            {parsed.items.map((p, i) => (
-              <p key={i}>
-                {p.name} ·{" "}
-                {p.amount === null ? "양 미상" : p.amount + " " + p.unit}
-              </p>
-            ))}
-            {parsed.normalizedText && (
-              <button
-                className="outline-button"
-                onClick={() => {
-                  setDraft({
-                    ...draft,
-                    raw: parsed.normalizedText!,
-                    foodId: null,
-                    source: "manual",
-                    amount: null,
-                    unit: null,
-                  });
-                  setSelectedFood(null);
-                  setParsed(null);
-                }}
-              >
-                구분한 내용 적용
-              </button>
-            )}
-            <small>
-              재료·알레르기 성분은 이름만으로 추정하지 않았어요. 위 입력을
-              수정할 수 있어요.
-            </small>
-          </div>
-        )}
-        {error && (
-          <p role="alert" className="warning">
-            {error}
-          </p>
-        )}
+        </details>
         <div className="button-row">
-          <button
-            className="outline-button"
-            disabled={!draft.raw.trim() || busy || pending || !!draft.foodId}
-            onClick={async () => {
-              setPending(true);
-              try {
-                setParsed(await onParse(draft.raw));
-                setError("");
-              } catch (e) {
-                setError((e as Error).message);
-              } finally {
-                setPending(false);
-              }
-            }}
-          >
-            {pending ? "확인 중…" : "입력 내용 미리 확인"}
+          <button className="outline-button" disabled={busy} onClick={onClose}>
+            취소
           </button>
           <button
             className="primary-button"
-            disabled={!draft.raw.trim() || busy || pending}
-            onClick={() => onSave(draft, meal?.id)}
+            disabled={
+              !selectedFood ||
+              !draft.foodId ||
+              busy ||
+              (draft.amount !== null &&
+                (!Number.isFinite(draft.amount) ||
+                  draft.amount <= 0 ||
+                  draft.amount > 10000))
+            }
+            onClick={() => void onSave(draft, meal?.id)}
           >
-            {meal
-              ? "수정 저장"
-              : draft.status === "confirmed"
-                ? "먹은 식사로 기록"
-                : "계획으로 저장"}
+            {busy
+              ? "저장 중…"
+              : meal
+                ? "수정 저장"
+                : draft.status === "confirmed"
+                  ? "먹은 식사로 기록"
+                  : "계획으로 저장"}
           </button>
         </div>
       </DialogContent>

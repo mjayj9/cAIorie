@@ -60,6 +60,7 @@ export const consentsSchema = z
 export const conditionsSchema = z
   .object({
     budget: z.number().finite().min(0).max(10000000).nullable(),
+    minDistance: z.number().finite().nonnegative().max(50000).default(0),
     maxDistance: z.number().finite().positive().max(50000).nullable(),
     availableMinutes: z.number().finite().positive().max(600).nullable(),
     returnTrip: z.boolean(),
@@ -70,7 +71,11 @@ export const conditionsSchema = z
     minRating: z.number().min(0).max(5).nullable(),
     minReviews: z.number().int().nonnegative().max(100000).nullable(),
   })
-  .strict();
+  .strict()
+  .refine((c) => c.maxDistance === null || c.minDistance <= c.maxDistance, {
+    message: "최소 거리는 최대 거리보다 클 수 없어요.",
+    path: ["minDistance"],
+  });
 export const weightsSchema = z
   .object({
     health: z.number().min(0).max(1),

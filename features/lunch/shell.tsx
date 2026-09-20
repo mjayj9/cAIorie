@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { UsageGuide } from "./usage-guide";
 import {
   BookOpen,
   ChevronRight,
@@ -146,6 +147,7 @@ function ShellContents({
             <span>나의 점심, 나의 기준</span>
           </div>
           <div className="flex items-center gap-3">
+            <UsageGuide />
             <span className="demo-tag">
               <Sparkles size={14} />
               {dataMode === "demo" ? "데모 데이터" : "실제 조회 모드"}

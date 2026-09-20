@@ -1,4 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
+import { skipGuide, pickOfficialFood } from "./helpers";
+test.beforeEach(async ({ page }) => skipGuide(page));
 test.skip(
   process.env.RUN_CONNECTED_API_TESTS !== "1",
   "Enable live public food lookup explicitly.",
@@ -47,7 +49,6 @@ test("official food reference, explicit grams, saved nutrition and mobile layout
   await page
     .getByRole("button", { name: "식사 기록하기", exact: true })
     .click();
-  await page.getByRole("tab", { name: "메뉴 검색", exact: true }).click();
   await page
     .getByRole("textbox", { name: "음식 검색", exact: true })
     .fill("쌀밥");
@@ -91,64 +92,65 @@ test("official food reference, explicit grams, saved nutrition and mobile layout
   await expect(page.locator(".meal-row")).toContainText("열량 미확인");
   expect(errors).toEqual([]);
 });
-test("AI consent is explicit and a reviewed preview can be applied before saving", async ({
+test("non-food text cannot be saved and date-specific records remain editable", async ({
   page,
 }) => {
   await seed(page);
-  await page
-    .getByRole("button", { name: "개인정보 관리", exact: true })
-    .click();
-  const consent = page.getByRole("switch", { name: /^외부 AI 전송/ });
-  await expect(consent).not.toBeChecked();
-  await expect(consent).toBeEnabled();
-  await consent.check();
-  await page
-    .getByRole("button", { name: "동의 변경 적용", exact: true })
-    .click();
-  await expect
-    .poll(
-      async () =>
-        (await (await page.request.get("/api/state")).json()).state.consents
-          .externalAi,
-    )
-    .toBe(true);
-  // Generation is verified in the live HTTP suite; this UI test uses a deterministic preview.
-  await page.route("**/api/meals/parse", (route) =>
-    route.fulfill({
-      json: {
-        items: [
-          { name: "쌀밥", amount: 100, unit: "g" },
-          { name: "두부", amount: 50, unit: "g" },
-        ],
-        method: "openrouter",
-        notice: "OpenRouter 무료 모델이 입력 문장을 구분했어요.",
-        normalizedText: "쌀밥 100g, 두부 50g",
-      },
-    }),
-  );
   await page
     .getByRole("button", { name: "나의 식사 기록", exact: true })
     .click();
   await page
     .getByRole("button", { name: "식사 기록하기", exact: true })
     .click();
+  const save = page.getByRole("button", {
+    name: "먹은 식사로 기록",
+    exact: true,
+  });
+  await expect(save).toBeDisabled();
+  for (const name of ["우라늄", "마약"]) {
+    await page
+      .getByRole("textbox", { name: "음식 검색", exact: true })
+      .fill(name);
+    const lookup = page.waitForResponse(
+      (response) => new URL(response.url()).pathname === "/api/foods",
+    );
+    await page.getByRole("button", { name: "검색", exact: true }).click();
+    expect((await lookup).status()).toBe(200);
+    await expect(
+      page.getByRole("button", { name: "검색", exact: true }),
+    ).toBeEnabled();
+    // MFDS may contain products such as 마약옥수수. A query alone never selects a food.
+    await expect(page.locator(".selected-food")).toHaveCount(0);
+    await expect(save).toBeDisabled();
+  }
+  await pickOfficialFood(page);
   await page
-    .getByRole("textbox", { name: "먹은 음식", exact: true })
-    .fill("쌀밥 100g 그리고 두부 50g");
+    .getByRole("spinbutton", { name: "드신 중량 (g)", exact: true })
+    .fill("100");
+  await save.click();
+  await expect(page.locator(".meal-row")).toHaveCount(1);
   await page
-    .getByRole("button", { name: "입력 내용 미리 확인", exact: true })
+    .getByRole("button", { name: "쌀밥 기록 수정", exact: true })
     .click();
-  await expect(page.locator(".parse-preview")).toContainText("OpenRouter");
   await page
-    .getByRole("button", { name: "구분한 내용 적용", exact: true })
-    .click();
-  await expect(
-    page.getByRole("textbox", { name: "먹은 음식", exact: true }),
-  ).toHaveValue("쌀밥 100g, 두부 50g");
+    .getByRole("spinbutton", { name: "드신 중량 (g)", exact: true })
+    .fill("200");
+  const yesterday = new Date(Date.now() - 86400000).toLocaleDateString(
+    "en-CA",
+    { timeZone: "Asia/Seoul" },
+  );
+  await page.getByLabel("식사 날짜", { exact: true }).fill(yesterday);
+  await page.getByRole("combobox", { name: "식사 시점", exact: true }).click();
+  await page.getByRole("option", { name: "저녁", exact: true }).click();
+  await page.getByRole("button", { name: "수정 저장", exact: true }).click();
+  await expect(page.locator(".meal-row")).toContainText("200 g");
+  await expect(page.locator(".meal-row")).toContainText("저녁");
+  await page.getByLabel("기록 날짜 필터", { exact: true }).fill(yesterday);
+  await expect(page.locator(".meal-row")).toHaveCount(1);
+  await page.reload();
   await page
-    .getByRole("button", { name: "먹은 식사로 기록", exact: true })
+    .getByRole("button", { name: "나의 식사 기록", exact: true })
     .click();
-  await expect(page.locator(".meal-row")).toContainText("두부");
-  const saved = await (await page.request.get("/api/state")).json();
-  expect(saved.meals[0].items).toHaveLength(2);
+  await expect(page.locator(".meal-row")).toContainText("200 g");
+  await expect(page.locator(".meal-row")).toContainText(yesterday);
 });

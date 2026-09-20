@@ -34,10 +34,16 @@ export function rankPlaces(
       for (const { profile, conditions: c, settings } of people) {
         if (profile.excluded.some((word) => text.includes(normalize(word))))
           return [];
+        const minimum = c.minDistance ?? 0;
         if (
-          c.maxDistance !== null &&
+          place.distance.value === null &&
+          (minimum > 0 || c.maxDistance !== null)
+        )
+          return [];
+        if (
           place.distance.value !== null &&
-          place.distance.value > c.maxDistance
+          (place.distance.value < minimum ||
+            (c.maxDistance !== null && place.distance.value > c.maxDistance))
         )
           return [];
         if (

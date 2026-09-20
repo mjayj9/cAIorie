@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import type { Conditions, HistoryAnalysis, Location } from "@/domain/models";
 import { money } from "./controls";
-import { formatDistance } from "@/domain/distance";
+import { formatDistance, formatDistanceRange } from "@/domain/distance";
 export function HomeHeader({
   analysis,
   conditions,
@@ -105,11 +105,11 @@ export function HomeHeader({
                   : money(conditions.budget, conditions.currency),
             },
             {
-              label: "이동 반경 · 직선",
-              value:
-                conditions.maxDistance === null
-                  ? "아직 설정 안 됨"
-                  : formatDistance(conditions.maxDistance),
+              label: "이동 거리 범위 · 직선",
+              value: formatDistanceRange(
+                conditions.minDistance ?? 0,
+                conditions.maxDistance,
+              ),
             },
             {
               label: "식사 가능 시간",

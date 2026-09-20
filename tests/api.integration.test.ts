@@ -27,7 +27,12 @@ type TestResponse = {
   proposals: import("../domain/models.ts").Relaxation[];
   conditionalCandidates: RankedCandidate[];
   capabilities: Capability[];
-  items: Array<{ name: string; latitude: number; longitude: number }>;
+  items: Array<{
+    name: string;
+    latitude: number;
+    longitude: number;
+    id?: string;
+  }>;
   learning: Learning;
 };
 import test from "node:test";
@@ -95,6 +100,13 @@ async function client() {
     },
   };
 }
+async function officialFood(c: Awaited<ReturnType<typeof client>>) {
+  const response = await c.send("foods?q=" + encodeURIComponent("쌀밥"));
+  assert.equal(response.status, 200);
+  const food = response.data.items.find((f) => f.name === "쌀밥");
+  assert.ok(food?.id);
+  return { raw: food.name, foodId: food.id, source: "search" as const };
+}
 test(
   "API: end-to-end recommendation, idempotent confirmation, feedback and deletion",
   { skip: !active },
@@ -127,11 +139,24 @@ test(
       });
       assert.equal(selected.status, 200);
       assert.equal((await c.send("state")).data.meals.length, 0);
+      for (const action of ["eaten", "changed"]) {
+        const invalid = await c.send("confirm", "POST", {
+          selectionId: selected.data.id,
+          action,
+          changedText: "마약",
+          timezone: "Asia/Seoul",
+        });
+        assert.equal(invalid.status, 400);
+      }
+      assert.equal((await c.send("state")).data.meals.length, 0);
+      const official = await officialFood(c);
       const confirmations = await Promise.all(
         [1, 2].map(() =>
           c.send("confirm", "POST", {
             selectionId: selected.data.id,
             action: "eaten",
+            foodId: official.foodId,
+            foodName: official.raw,
             timezone: "Asia/Seoul",
           }),
         ),
@@ -179,13 +204,11 @@ test(
       const sa = await a.setup();
       await b.setup();
       const meal = await a.send("meals", "POST", {
-        raw: "밥",
+        ...(await officialFood(a)),
         day: localDate(new Date()),
         slot: "lunch",
         timezone: "Asia/Seoul",
         status: "confirmed",
-        source: "manual",
-        foodId: null,
         amount: null,
         unit: null,
         idempotencyKey: crypto.randomUUID(),
@@ -224,13 +247,11 @@ test(
       s.profile.ageBand = "teen";
       await c.setup({ profile: s.profile, consents: s.consents });
       const draft = {
-        raw: "카레",
+        ...(await officialFood(c)),
         day: localDate(new Date()),
         slot: "lunch",
         timezone: "Asia/Seoul",
         status: "confirmed",
-        source: "manual",
-        foodId: null,
         amount: null,
         unit: null,
         idempotencyKey: crypto.randomUUID(),
@@ -380,13 +401,11 @@ test(
     try {
       const s = await c.setup();
       const meal = await c.send("meals", "POST", {
-        raw: "비빔밥",
+        ...(await officialFood(c)),
         day: localDate(new Date()),
         slot: "lunch",
         timezone: "Asia/Seoul",
         status: "confirmed",
-        source: "manual",
-        foodId: null,
         amount: null,
         unit: null,
         idempotencyKey: crypto.randomUUID(),
@@ -442,7 +461,11 @@ test(
       const result = await c.send("recommend", "POST", {
         profile: s.profile,
         settings: s.settings,
-        conditions: { ...s.settings.conditions, maxDistance: 1000 },
+        conditions: {
+          ...s.settings.conditions,
+          minDistance: 500,
+          maxDistance: 2000,
+        },
         location: {
           latitude: match.latitude,
           longitude: match.longitude,
@@ -465,6 +488,21 @@ test(
         ),
       );
       assert.equal(result.data.recommendations.length, 0);
+      assert.ok(
+        result.data.nearbyPlaces.every(
+          (p) =>
+            p.distance.value !== null &&
+            p.distance.value >= 500 &&
+            p.distance.value <= 2000,
+        ),
+      );
+      assert.ok(
+        result.data.nearbyPlaces.every(
+          (p) =>
+            p.directionsUrl?.includes("/link/from/") &&
+            p.directionsUrl.includes("/to/"),
+        ),
+      );
     } finally {
       assert.equal((await c.send("privacy/delete", "POST", {})).status, 200);
     }
@@ -572,13 +610,11 @@ test(
     try {
       const s = await c.setup();
       const m = await c.send("meals", "POST", {
-        raw: "비빔밥",
+        ...(await officialFood(c)),
         day: shiftDay(localDate(new Date()), -10),
         slot: "lunch",
         timezone: "Asia/Seoul",
         status: "confirmed",
-        source: "manual",
-        foodId: null,
         amount: null,
         unit: null,
         idempotencyKey: crypto.randomUUID(),

@@ -9,6 +9,7 @@ import type {
 export const POLICY_VERSION = "2026-09-19.v1";
 export const conditions: Conditions = {
   budget: null,
+  minDistance: 0,
   maxDistance: null,
   availableMinutes: null,
   returnTrip: false,

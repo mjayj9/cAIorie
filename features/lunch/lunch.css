@@ -1494,3 +1494,149 @@
     grid-column: 1 / -1;
   }
 }
+
+/* Explicit food selection, range controls and first-visit guidance. */
+.distance-range-row {
+  align-items: end;
+}
+.distance-range-row label {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  font-size: 12px;
+}
+.distance-range-row input {
+  width: 100%;
+  min-width: 0;
+}
+.distance-range-row > span {
+  padding-bottom: 12px;
+}
+.distance-range-row select {
+  min-width: 62px;
+  width: 68px;
+  height: 43px;
+}
+.journal-filter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.journal-filter label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.journal-filter input {
+  border: 1px solid #dce4dc;
+  border-radius: 8px;
+  padding: 8px;
+}
+.journal-filter small {
+  flex-basis: 100%;
+  color: #65786f;
+}
+.journal-edit {
+  flex-shrink: 0;
+}
+.official-food-picker {
+  min-width: 0;
+}
+.official-food-picker .button-row input {
+  flex: 1;
+  min-width: 120px;
+}
+.food-search-results {
+  max-height: 250px;
+  overflow-y: auto;
+}
+.selected-food {
+  padding: 12px 14px;
+  background: #eef5e9;
+  border-radius: 8px;
+  color: #234e3f;
+}
+.pending-food-picker {
+  padding: 16px 0;
+  max-width: 620px;
+}
+.map-link-help {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: #526c61;
+  order: 5;
+}
+.map-link-help summary {
+  cursor: pointer;
+  padding: 5px 0;
+}
+.map-link-help p {
+  margin: 8px 0;
+  max-width: 650px;
+}
+.map-link-help a {
+  text-decoration: underline;
+  font-weight: 600;
+}
+.restaurant-phone {
+  font-size: 24px;
+  font-weight: 700;
+}
+.usage-guide {
+  max-width: 560px;
+}
+.guide-progress {
+  display: flex;
+  gap: 10px;
+}
+.guide-progress button {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #edf2eb;
+  color: #486052;
+}
+.guide-progress button[aria-current="step"] {
+  background: #1d5947;
+  color: white;
+}
+.guide-step {
+  display: grid;
+  gap: 10px;
+  padding: 12px 0;
+}
+.guide-step h2 {
+  font-size: 22px;
+  line-height: 1.4;
+}
+.guide-step p {
+  line-height: 1.75;
+}
+.guide-step .mini-icon {
+  width: 52px;
+  height: 52px;
+}
+.guide-launch {
+  white-space: nowrap;
+}
+@media (max-width: 600px) {
+  .meal-row {
+    flex-wrap: wrap;
+  }
+  .journal-edit {
+    margin-left: auto;
+    min-height: 42px;
+  }
+  .topbar .demo-tag {
+    display: none;
+  }
+  .distance-range-row input {
+    min-width: 0 !important;
+  }
+  .guide-step h2 {
+    font-size: 20px;
+  }
+}

@@ -70,6 +70,7 @@ export async function context(request: Request): Promise<Context> {
       (externalOrigin.startsWith("https:") ? "; Secure" : "");
   }
   const state = JSON.parse(row.state) as SessionState;
+  state.settings.conditions.minDistance ??= 0;
   if (state.consents.saveSensitive && config.encryptionKey.length >= 32) {
     const sensitive = await repo.first<{ payload: string }>(
       "SELECT payload FROM sensitive_profiles WHERE owner = ?",

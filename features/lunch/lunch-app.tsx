@@ -47,7 +47,12 @@ import { SettingsView } from "./settings";
 import { PrivacyView } from "./privacy";
 import { GroupView, type GroupStatus } from "./groups";
 import { ConnectionsView } from "./connections";
-import { FeedbackDialog, PendingMeal, SelectionDialog } from "./confirmation";
+import {
+  FeedbackDialog,
+  PendingMeal,
+  SelectionDialog,
+  type ConfirmedFood,
+} from "./confirmation";
 export function LunchApp() {
   const [view, setView] = useState<View>("home"),
     [snapshot, setSnapshot] = useState<Snapshot | null>(null),
@@ -277,7 +282,7 @@ export function LunchApp() {
   const confirm = async (
     selection: Selection,
     action: "eaten" | "changed" | "not_eaten" | "later",
-    text?: string,
+    food?: ConfirmedFood,
   ) => {
     await perform(async () => {
       const data = await post<{
@@ -288,7 +293,7 @@ export function LunchApp() {
       }>("confirm", {
         selectionId: selection.id,
         action,
-        changedText: text,
+        ...food,
         timezone: state.settings.notifications.timezone,
       });
       if (action !== "later") {
@@ -450,7 +455,7 @@ export function LunchApp() {
               key={s.id}
               selection={s}
               busy={busy}
-              onConfirm={(action, text) => void confirm(s, action, text)}
+              onConfirm={(action, food) => void confirm(s, action, food)}
             />
           ))}
           {busy && (
@@ -821,7 +826,6 @@ export function LunchApp() {
           busy={busy}
           onClose={() => setEditor(null)}
           onSave={onSaveMeal}
-          onParse={(text) => post("meals/parse", { text })}
         />
       )}
       {selecting && result && (

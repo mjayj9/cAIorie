@@ -11,116 +11,16 @@ import {
   parseMealText,
   transitionSelection,
 } from "../../domain/meals.ts";
-import type { Meal, Mode } from "../../domain/models.ts";
-import { nutritionForGrams } from "../../domain/foods.ts";
-import { resolveFood } from "../../providers/nutrition.ts";
+import type { Meal } from "../../domain/models.ts";
+import { makeMeal } from "../meal-builder.ts";
 import { aiConfigured } from "../../providers/contracts.ts";
 import {
   parseWithOpenRouter,
   type MealParseResult,
 } from "../../providers/ai.ts";
-import { demoCatalog, requireMealAccess } from "./catalog.ts";
+import { requireMealAccess } from "./catalog.ts";
 import type { Context } from "../context.ts";
 import { AppError, requireValue } from "../errors.ts";
-const errorFuture = () =>
-  new AppError(
-    400,
-    "FUTURE_MEAL",
-    "아직 먹지 않은 식사는 계획으로 저장해 주세요.",
-  );
-async function makeMeal(
-  c: Context,
-  data: z.infer<typeof mealDraftSchema>,
-  id = crypto.randomUUID(),
-  mode: Mode = c.config.demoMode ? "demo" : "live",
-  old?: Meal,
-): Promise<Meal> {
-  if (
-    data.status === "confirmed" &&
-    data.day > localDate(new Date(), data.timezone)
-  )
-    throw errorFuture();
-  let items = parseMealText(data.raw);
-  if (!items.length)
-    throw new AppError(400, "EMPTY_MEAL", "음식 이름을 입력해 주세요.");
-  if (data.foodId) {
-    if (data.source !== "search")
-      throw new AppError(
-        400,
-        "FOOD_MISMATCH",
-        "검색한 음식을 다시 선택해 주세요.",
-      );
-    // An existing reference comes only from this owner's server-stored meal.
-    const prior =
-      old?.items.length === 1 ? old.items[0].foodReference : undefined;
-    let food =
-      prior?.id === data.foodId && prior.name === data.raw ? prior : null;
-    if (!food) {
-      try {
-        food = c.config.demoMode
-          ? (demoCatalog.find(
-              (f) => f.id === data.foodId && f.name === data.raw,
-            ) ?? null)
-          : data.foodId.startsWith("mfds:")
-            ? await resolveFood(
-                c.config,
-                data.foodId,
-                data.raw,
-                c.request.signal,
-              )
-            : null;
-      } catch {
-        throw new AppError(
-          503,
-          "NUTRITION_UNAVAILABLE",
-          "선택한 식품을 확인하지 못했어요. 입력은 유지되며 다시 검색할 수 있어요.",
-        );
-      }
-    }
-    if (!food)
-      throw new AppError(
-        400,
-        "FOOD_MISMATCH",
-        "선택한 공식 식품과 입력이 일치하지 않아요. 다시 검색해 주세요.",
-      );
-    if (data.amount !== null && data.unit !== "g")
-      throw new AppError(
-        400,
-        "GRAMS_REQUIRED",
-        "공식 영양량 환산에는 g 단위 중량을 입력해 주세요.",
-      );
-    items = [
-      {
-        ...items[0],
-        name: food.name,
-        foodId: food.id,
-        foodReference: food,
-        amount: data.amount,
-        unit: data.amount === null ? null : "g",
-        nutrition: nutritionForGrams(food, data.amount),
-        foodGroups: [],
-        cooking: null,
-        tagBasis: food.provider + " · " + (food.category ?? "분류 미확인"),
-      },
-    ];
-  } else if (data.amount !== null && items.length === 1) {
-    items[0].amount = data.amount;
-    items[0].unit = data.unit;
-  }
-  return {
-    id,
-    day: data.day,
-    slot: data.slot,
-    timezone: data.timezone,
-    raw: data.raw,
-    items,
-    status: data.status,
-    source: data.source,
-    confirmedAt: data.status === "confirmed" ? new Date().toISOString() : null,
-    visit: null,
-    dataMode: mode,
-  };
-}
 export async function parse(
   c: Context,
   input: unknown,
@@ -251,11 +151,14 @@ export async function deleteMeals(c: Context, input: unknown) {
   return { deleted: true };
 }
 export async function confirmMeal(c: Context, input: unknown) {
+  requireMealAccess(c);
   const data = z
     .object({
       selectionId: z.string().uuid(),
       action: z.enum(["eaten", "changed", "not_eaten", "later"]),
       changedText: z.string().trim().max(2000).optional(),
+      foodId: z.string().max(80).optional(),
+      foodName: z.string().trim().min(1).max(2000).optional(),
       timezone: timezoneSchema,
       amount: z.number().positive().max(10000).nullable().optional(),
       unit: z.string().max(20).nullable().optional(),
@@ -278,31 +181,25 @@ export async function confirmMeal(c: Context, input: unknown) {
     return { selection, meal: null, stored: false };
   let meal: Meal | null = null;
   if (status === "confirmed_eaten" || status === "changed_meal") {
-    if (status === "changed_meal" && !data.changedText)
+    if (!data.foodId || !data.foodName)
       throw new AppError(
         400,
-        "ACTUAL_MEAL_REQUIRED",
-        "실제로 드신 음식을 입력해 주세요.",
+        "OFFICIAL_FOOD_REQUIRED",
+        "실제로 드신 음식을 식약처 DB에서 선택해 주세요.",
       );
-    const raw =
-      status === "changed_meal" ? data.changedText! : selection.menu.name;
     const draft = mealDraftSchema.parse({
-      raw,
+      raw: data.foodName,
       day: localDate(new Date(), data.timezone),
       slot: "lunch",
       timezone: data.timezone,
       status: "confirmed",
-      source: status === "changed_meal" ? "manual" : "selection",
-      foodId: null,
+      source: "search",
+      foodId: data.foodId,
       amount: data.amount ?? null,
       unit: data.unit ?? null,
       idempotencyKey: selection.id,
     });
     meal = await makeMeal(c, draft, selection.id, selection.dataMode);
-    if (status === "confirmed_eaten") {
-      meal.items[0].foodGroups = selection.menu.foodGroups;
-      meal.items[0].cooking = selection.menu.cooking;
-    }
     if (c.state.consents.saveVisits && status === "confirmed_eaten")
       meal.visit = { placeId: selection.placeId, menuId: selection.menu.id };
   }

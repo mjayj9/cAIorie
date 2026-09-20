@@ -59,10 +59,15 @@ export function evaluateCandidate(
     else if (menu.price.value > conditions.budget)
       exclude("1인 예산을 초과해요.");
   }
-  if (conditions.maxDistance !== null) {
+  if ((conditions.minDistance ?? 0) > 0 || conditions.maxDistance !== null) {
     if (place.distance.value === null) conditional("거리");
-    else if (place.distance.value > conditions.maxDistance)
-      exclude("이동 반경을 초과해요.");
+    else if (place.distance.value < (conditions.minDistance ?? 0))
+      exclude("최소 이동 거리보다 가까워요.");
+    else if (
+      conditions.maxDistance !== null &&
+      place.distance.value > conditions.maxDistance
+    )
+      exclude("최대 이동 거리를 초과해요.");
   }
   if (conditions.availableMinutes !== null) {
     const d = [
@@ -164,7 +169,7 @@ export function evaluateCandidate(
   missing.push("검증된 건강 적합도");
   if (conditions.budget === null)
     reasons.push("예산 미설정: 가격으로 제한하지 않았어요.");
-  if (conditions.maxDistance === null)
+  if (conditions.maxDistance === null && !(conditions.minDistance > 0))
     reasons.push("이동 반경 미설정: 거리로 제한하지 않았어요.");
   if (!reasons.length)
     reasons.push("확인된 정보와 나의 중요도를 함께 반영했어요.");

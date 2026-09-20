@@ -15,6 +15,14 @@ import type {
   RankedCandidate,
 } from "@/domain/models";
 import { Check as CheckField, Choice, Field, money } from "./controls";
+import { FoodPicker } from "./food-picker";
+import type { CatalogFood } from "@/domain/foods";
+export type ConfirmedFood = {
+  foodId: string;
+  foodName: string;
+  amount: number | null;
+  unit: "g" | null;
+};
 export function PendingMeal({
   selection,
   busy,
@@ -24,11 +32,12 @@ export function PendingMeal({
   busy: boolean;
   onConfirm: (
     action: "eaten" | "changed" | "not_eaten" | "later",
-    text?: string,
+    food?: ConfirmedFood,
   ) => void;
 }) {
-  const [changed, setChanged] = useState(false),
-    [text, setText] = useState(""),
+  const [recording, setRecording] = useState<"eaten" | "changed" | null>(null),
+    [food, setFood] = useState<CatalogFood | null>(null),
+    [amount, setAmount] = useState<number | null>(null),
     [hidden, setHidden] = useState(false);
   if (hidden)
     return (
@@ -49,31 +58,61 @@ export function PendingMeal({
         <span className="eyebrow">선택은 기록이 아니에요</span>
         <h3>{selection.menu.name}, 실제로 드셨나요?</h3>
         <p>{selection.placeName} · 아직 식사 기록에 반영되지 않았어요.</p>
-        {changed && (
-          <Field label="실제로 먹은 음식">
-            <input
-              aria-label="실제로 먹은 음식"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="실제 드신 메뉴를 적어주세요"
+        {recording && (
+          <div className="pending-food-picker">
+            <FoodPicker
+              selected={food}
+              onSelect={(selected) => {
+                setFood(selected);
+                setAmount(null);
+              }}
+              initialQuery={recording === "eaten" ? selection.menu.name : ""}
+              disabled={busy}
             />
-          </Field>
+            {food && (
+              <Field label="드신 중량 (g)" hint="모르면 비워 두세요.">
+                <input
+                  aria-label="드신 중량 (g)"
+                  type="number"
+                  min="0.1"
+                  max="10000"
+                  step="any"
+                  value={amount ?? ""}
+                  onChange={(e) =>
+                    setAmount(e.target.value ? Number(e.target.value) : null)
+                  }
+                />
+              </Field>
+            )}
+          </div>
         )}
         <div className="button-row">
-          {changed ? (
+          {recording ? (
             <button
               className="primary-button"
-              disabled={busy || !text.trim()}
-              onClick={() => onConfirm("changed", text)}
+              disabled={
+                busy ||
+                !food ||
+                (amount !== null && (amount <= 0 || amount > 10000))
+              }
+              onClick={() =>
+                food &&
+                onConfirm(recording, {
+                  foodId: food.id,
+                  foodName: food.name,
+                  amount,
+                  unit: amount === null ? null : "g",
+                })
+              }
             >
-              이 식사로 확인
+              선택한 음식으로 기록
             </button>
           ) : (
             <>
               <button
                 className="primary-button"
                 disabled={busy}
-                onClick={() => onConfirm("eaten")}
+                onClick={() => setRecording("eaten")}
               >
                 <Check size={16} />
                 먹었어요
@@ -81,7 +120,7 @@ export function PendingMeal({
               <button
                 className="outline-button"
                 disabled={busy}
-                onClick={() => setChanged(true)}
+                onClick={() => setRecording("changed")}
               >
                 다른 걸 먹었어요
               </button>

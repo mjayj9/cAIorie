@@ -32,7 +32,7 @@
 
 현재 앱은 `openrouter/free` 또는 `:free` 모델만 허용한다. 유료 모델로 자동 전환하지 않는다. 서버는 고정 Chat Completions 주소에 Bearer 키를 전달한다. `response_format=json_schema`, `strict=true`, `provider.require_parameters=true`, `provider.data_collection=deny`를 요청한다. 제공자 정책에 관한 이 옵션은 앱 자체가 모든 외부 보관을 통제한다는 보장이 아니다.
 
-성인 설정과 `externalAi` 동의가 모두 필요하다. 전송 내용은 현재 입력 문장과 고정된 구조화 지시뿐이며, 프로필·위치·과거 식사 목록은 포함하지 않는다. 기본 OFF, 미리 확인을 눌렀을 때만 호출한다. 반환 조각이 원문의 겹치지 않는 부분 문자열인지 순서까지 검사하고, 양·영양·알레르겐을 새로 만들지 않는다. 사용자가 결과를 적용해야 기록할 원문이 바뀐다. 실패 시 규칙 기반 결과와 실패 안내를 반환한다.
+성인 설정과 `externalAi` 동의가 모두 필요하다. 전송 내용은 현재 입력 문장과 고정된 구조화 지시뿐이며, 프로필·위치·과거 식사 목록은 포함하지 않는다. 기본 OFF이며 문장 분석 API 요청 시에만 호출한다. 음식 입력 UI는 식약처 DB 검색만 사용한다. 반환 조각이 원문의 겹치지 않는 부분 문자열인지 순서까지 검사하고, 양·영양·알레르겐을 새로 만들지 않는다. 분석 결과는 식사 저장으로 연결되지 않으며 식약처 항목 선택이 별도로 필요하다. 실패 시 규칙 기반 결과와 실패 안내를 반환한다.
 
 실제 인증과 공개 예문 생성, 앱 서버를 통한 동의 전후 처리까지 확인했다. [현재 키 조회](https://openrouter.ai/docs/api/api-reference/api-keys/get-current-api-key), [구조화 출력](https://openrouter.ai/docs/guides/features/structured-outputs), [무료 라우터](https://openrouter.ai/openrouter/free).
 
@@ -44,7 +44,7 @@
 
 DB 원자료는 verified, 입력한 g 중량으로 환산한 식사 영양량은 estimated다. 중량 또는 g 기준량을 모르면 null이며 공기·개·인분·ml를 임의로 g으로 바꾸지 않는다. 실제 음식점 메뉴의 영양·알레르기 성분으로 일반화하지 않는다.
 
-서버가 조회한 식품 ID와 이름을 확인하고 출처·기준값을 식사에 함께 보관한다. 클라이언트가 영양 수치를 지정할 수 없다. 공개 카탈로그만 최대 500건·15분 메모리 캐시하며, 기존 기록 수정에는 소유자가 서버에 보관한 기준값을 재사용한다.
+신규 저장·수정·섭취 확인 모두 서버가 조회한 식품 ID와 이름을 대조하고 출처·기준값을 식사에 함께 보관한다. demo/live에 관계없이 이 검증을 거치며 임의 입력과 위조 ID를 거부한다. 클라이언트가 영양 수치를 지정할 수 없다. 공개 카탈로그만 최대 500건·15분 메모리 캐시하며, 기존 기록 수정에는 소유자가 서버에 보관한 기준값을 재사용한다.
 
 ## 행정안전부
 
@@ -54,7 +54,7 @@ DB 원자료는 verified, 입력한 g 중량으로 환산한 식사 영양량은
 
 ## 장소 제공자
 
-Kakao는 [공식 Local API](https://developers.kakao.com/docs/ko/local/dev-guide)의 주소·키워드·FD6 검색을 사용한다. 주소 결과가 없으면 역·건물 이름 검색으로 이어진다. 먹고 싶은 음식은 FD6 키워드 검색에 전달한다. 이름·주소·업종·전화·좌표·출처·직선거리를 매핑하며 메뉴·가격·평점·운영시간을 만들지 않는다. 조회 범위는 최대 20km, 가까운 결과 최대 15곳이다. 공개 서울역 검색에서 식당 비교·선택·실제 식사 기록까지 검증했다. 반경 때문에 결과가 없으면 한 번의 제한된 추가 조회로 유효한 확장 범위를 확인하며 조건은 사용자가 변경안을 눌러야 바뀐다.
+Kakao는 [공식 Local API](https://developers.kakao.com/docs/ko/local/dev-guide)의 주소·키워드·FD6 검색을 사용한다. 주소 결과가 없으면 역·건물 이름 검색으로 이어진다. 먹고 싶은 음식은 FD6 키워드 검색에 전달한다. 이름·주소·업종·전화·좌표·출처·직선거리를 매핑하며 메뉴·가격·평점·운영시간을 만들지 않는다. 조회 범위는 최대 20km다. 최소 거리가 있으면 안쪽 영역을 제외한 네 사각형을 제한 조회하며 거리 범위 밖과 중복 결과를 제거한다. 최대 30곳을 비교한다. 공개 서울역 검색에서 식당 비교·선택·실제 식사 기록까지 검증했다. 반경 때문에 결과가 없으면 한 번의 제한된 추가 조회로 유효한 확장 범위를 확인하며 조건은 사용자가 변경안을 눌러야 바뀐다.
 
 Google은 [Nearby Search New](https://developers.google.com/maps/documentation/places/web-service/nearby-search)의 명시적 FieldMask를 사용한다. id, displayName, formattedAddress, location, rating, userRatingCount, googleMapsUri, currentOpeningHours.openNow를 요청한다. [표시·저장 정책](https://developers.google.com/maps/documentation/places/web-service/policies)에 따라 출처 링크를 표시하고 장소 자료를 DB 추천 캐시에 보관하지 않는다. 실제 Google 계정 호출·요금·지역별 응답은 미검증이다.
 

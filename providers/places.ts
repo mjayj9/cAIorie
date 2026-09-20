@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { straightLineMetres } from "../domain/distance.ts";
+import { straightLineMetres, distanceSearchRects } from "../domain/distance.ts";
+import { kakaoDirections } from "../domain/place-links.ts";
 import type {
   Evidence,
   Location,
@@ -78,7 +79,10 @@ const kakaoSchema = z.object({
     }),
   ),
 });
-export function normalizeKakao(input: unknown): ProviderResult {
+export function normalizeKakao(
+  input: unknown,
+  origin?: Location,
+): ProviderResult {
   const parsed = kakaoSchema.safeParse(input);
   if (!parsed.success) throw new ProviderError("invalid_response");
   const places = parsed.data.documents.flatMap((d) => {
@@ -112,9 +116,8 @@ export function normalizeKakao(input: unknown): ProviderResult {
     );
     p.distance.unit = "m";
     p.distanceType = p.distance.value === null ? "unknown" : "straight_line";
-    p.url = safeSourceUrl(d.place_url);
-    p.directionsUrl =
-      "https://map.kakao.com/link/to/" + encodeURIComponent(d.id);
+    p.url = safeSourceUrl(d.place_url)?.replace(/^http:/, "https:") ?? null;
+    p.directionsUrl = kakaoDirections(p, origin);
     return [p];
   });
   return {
@@ -131,6 +134,7 @@ export async function searchKakao(
   radius: number | null,
   signal?: AbortSignal,
   query = "",
+  minDistance = 0,
 ) {
   if (!isUsableKey(c.kakaoKey)) throw new ProviderError("unconfigured");
   const keyword = query.trim();
@@ -149,22 +153,73 @@ export async function searchKakao(
   );
   url.searchParams.set("sort", "distance");
   url.searchParams.set("size", "15");
-  const result = normalizeKakao(
-    await providerFetch(url.href, {
-      headers: { Authorization: "KakaoAK " + c.kakaoKey },
-      signal,
-    }),
+  const maximum = Math.min(radius ?? 20000, 20000);
+  if (minDistance > maximum)
+    return {
+      places: [],
+      evidence: [],
+      notices: [
+        "국내 식당 조회는 선택한 위치에서 최대 20km까지 지원해요. 거리 범위를 20km 안으로 조정해 주세요.",
+      ],
+    };
+  const result: ProviderResult = {
+    places: [],
+    evidence: [],
+    notices: [
+      "Kakao에서 확인한 식당을 비교해요. 메뉴·가격·영업시간은 식당 상세에서 확인해 주세요.",
+    ],
+  };
+  // A minimum radius needs distributed lookups; filtering only the nearest page
+  // would miss every restaurant in a distant band in dense city centres.
+  const rectangles =
+    minDistance > 0
+      ? distanceSearchRects(location, minDistance, maximum)
+      : [null];
+  const found = new Map<string, Place>();
+  for (const rect of rectangles) {
+    const searchUrl = new URL(url);
+    if (rect) {
+      searchUrl.searchParams.delete("radius");
+      searchUrl.searchParams.set("rect", rect);
+      searchUrl.searchParams.set("sort", "accuracy");
+    }
+    for (let page = 1; page <= (rect ? 3 : 1); page++) {
+      searchUrl.searchParams.set("page", String(page));
+      const raw = await providerFetch(searchUrl.href, {
+        headers: { Authorization: "KakaoAK " + c.kakaoKey },
+        signal,
+      });
+      const batch = normalizeKakao(raw, location);
+      for (const place of batch.places) {
+        const distance = place.distance.value;
+        if (
+          distance !== null &&
+          distance >= minDistance &&
+          distance <= maximum
+        ) {
+          if (keyword) place.matchedQuery = keyword;
+          found.set(place.id, place);
+        }
+      }
+      const more = z
+        .object({ meta: z.object({ is_end: z.boolean() }) })
+        .safeParse(raw);
+      if (found.size >= 15 || !more.success || more.data.meta.is_end) break;
+    }
+  }
+  result.places = [...found.values()]
+    .sort((a, b) => a.distance.value! - b.distance.value!)
+    .slice(0, 30);
+  result.evidence = result.places.map((p) =>
+    evidence(p.evidenceIds[0], p, p.url),
   );
-  if (keyword)
-    result.places.forEach((p) => {
-      p.matchedQuery = keyword;
-    });
   if (radius === null || radius > 20000)
     result.notices.push(
-      "국내 장소 검색 범위는 최대 반경 20km예요. 가까운 검색 결과 최대 15곳을 비교해요.",
+      "국내 장소 조회는 최대 20km까지 지원하며, 제공된 검색 결과 중 거리 조건에 맞는 식당을 비교해요.",
     );
   return result;
 }
+
 const googleSchema = z.object({
   places: z
     .array(
